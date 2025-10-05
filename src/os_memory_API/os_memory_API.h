@@ -3,7 +3,7 @@
 
 /* ====== FUNCIONES GENERALES ====== */
 
-// void mount_memory(char* memory_path);
+void mount_memory(char* memory_path);
 
 // void list_processes();
 

@@ -1,1 +1,11 @@
 #pragma once
+#include "stdbool.h"
+#include "stdlib.h"
+#include "../uint40_t/uint40_t.h"
+
+typedef struct osmFile {
+    bool validity;
+    char name[13]; // No incluye el ’\0’ al final
+    uint40_t file_size;
+    int32_t virtual_adress;
+} osmFile;
