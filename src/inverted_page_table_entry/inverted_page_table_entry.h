@@ -10,9 +10,9 @@ typedef struct {
 
 bool get_validity(InvertedPageTableEntry inverted_page_table_entry);
 
-u_int16_t get_virtualPageNumber(InvertedPageTableEntry inverted_page_table_entry);
+uint16_t get_virtualPageNumber(InvertedPageTableEntry inverted_page_table_entry);
 
-u_int16_t get_processesIdentifier(InvertedPageTableEntry inverted_page_table_entry);
+uint16_t get_processesIdentifier(InvertedPageTableEntry inverted_page_table_entry);
 
 void set_validity(InvertedPageTableEntry* entry, bool validity);
 
