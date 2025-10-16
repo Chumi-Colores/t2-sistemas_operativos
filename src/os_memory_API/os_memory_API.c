@@ -72,7 +72,61 @@ void mount_memory(char* memory_path) {
         exit(EXIT_FAILURE);
 }
 
-
 // // funciones procesos
+int start_process(int process_id, char* process_name) {
+    ProcessControlBlockEntry* pcb_entry = &process_control_block_table.entries[process_id];
+    
+    if (pcb_entry->state) {
+        return -1;
+    }
 
+    pcb_entry->state = 1;
+    pcb_entry->id = process_id;
+    strncpy(pcb_entry->name, process_name, 14);
+    return 0;
+}
+
+int finish_process(int process_id) {
+    ProcessControlBlockEntry* pcb_entry = &process_control_block_table.entries[process_id];
+    
+    if (!pcb_entry->state) {
+        return -1;
+    }
+
+    pcb_entry->state = 0;
+    pcb_entry->id = 0;
+    memset(pcb_entry->name, 0, sizeof(pcb_entry->name));
+    memset(pcb_entry->file_table, 0, sizeof(pcb_entry->file_table));
+    return 0;
+}
+
+int clear_all_processes() {
+    int terminated_processes_count = 0;
+    for (size_t i = 0; i < process_control_block_table.num_entries; i++) {
+        ProcessControlBlockEntry* pcb_entry = &process_control_block_table.entries[i];
+        if (pcb_entry->state) {
+            terminated_processes_count++;
+        }
+        pcb_entry->state = 0;
+        pcb_entry->id = 0;
+        memset(pcb_entry->name, 0, sizeof(pcb_entry->name));
+        memset(pcb_entry->file_table, 0, sizeof(pcb_entry->file_table));
+    }
+    return terminated_processes_count;
+}
+
+int file_table_slots(int process_id) {
+    ProcessControlBlockEntry* pcb_entry = &process_control_block_table.entries[process_id];
+    if (!pcb_entry->state) {
+        return -1;
+    }
+
+    int free_slots = 0;
+    for (size_t i = 0; i < 10; i++) {
+        if (pcb_entry->file_table[i].validity == 0) {
+            free_slots++;
+        }
+    }
+    return free_slots;
+}
 // // funciones archivos

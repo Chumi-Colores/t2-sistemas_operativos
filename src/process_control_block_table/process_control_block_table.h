@@ -4,7 +4,7 @@
 #include "../process_control_block/process_control_block.h"
 
 typedef struct {
-    ProcessControlBlock* entries;
+    ProcessControlBlockEntry* entries;
     size_t num_entries;
 } ProcessControlBlockTable;
 
