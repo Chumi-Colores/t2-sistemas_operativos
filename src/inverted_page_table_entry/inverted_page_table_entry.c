@@ -4,23 +4,23 @@
 #include "inverted_page_table_entry.h"
 
 
-bool get_validity(InvertedPageTableEntry entry)
+bool get_validity(InvertedPageTableEntry* entry)
 {
-    return entry.data[0] & 0b00000001;
+    return entry->data[0] & 0b00000001;
 }
 
-uint16_t get_processesIdentifier(InvertedPageTableEntry entry)
+uint16_t get_processesIdentifier(InvertedPageTableEntry* entry)
 {
     // PID = bits 1–10 (10 bits)
-    uint16_t pid = (((entry.data[1] << 8) | entry.data[0]) & 0b0000011111111110) >> 1;
+    uint16_t pid = (((entry->data[1] << 8) | entry->data[0]) & 0b0000011111111110) >> 1;
     return pid; // quitamos los 2 bits más altos no significativos
 }
 
-uint16_t get_virtualPageNumber(InvertedPageTableEntry entry)
+uint16_t get_virtualPageNumber(InvertedPageTableEntry* entry)
 {
     // VPN = bits 11–23 (13 bits)
-    // Si uno ignora el entry.data[0] son los bits bits 8–15 (13 bits)
-    uint16_t vpn = (entry.data[2] << 8) | (entry.data[1]) >> 3;
+    // Si uno ignora el entry->data[0] son los bits bits 8–15 (13 bits)
+    uint16_t vpn = (entry->data[2] << 8) | (entry->data[1]) >> 3;
     return vpn; // quitamos el bit más alto no significativo
 }
 

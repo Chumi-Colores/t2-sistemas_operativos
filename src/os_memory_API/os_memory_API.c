@@ -1,15 +1,75 @@
-#include <stdio.h>	// FILE, fopen, fclose, etc.
-#include <stdlib.h> // malloc, calloc, free, etc
-#include <string.h> //para strcmp
-#include <stdbool.h> // bool, true, false
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
 #include "os_memory_API.h"
+#include "../process_control_block_table/process_control_block_table.h"
+#include "../inverted_page_table/inverted_page_table.h"
+#include "../frame_bitmap/frame_bitmap.h"
+#include "../data/data.h"
 
+
+// Variables globales declaradas como extern en os_memory_API.c
 extern char bin_memory_path[100];
+extern ProcessControlBlockTable process_control_block_table;
+extern InvertedPageTable inverted_page_table;
+extern FrameBitmap frame_bitmap;
+extern Data data;
 
-// funciones generales
-void mount_memory(char* memory_path)
-{
+void mount_memory(char* memory_path) {
+    // 1. Guardar la ruta en la variable global
     strcpy(bin_memory_path, memory_path);
+
+    // 2. Abrir el archivo binario de memoria física
+    FILE* mem_file = fopen(memory_path, "rb");
+    if (mem_file == NULL) {
+        perror("Error al abrir el archivo de memoria");
+        exit(EXIT_FAILURE);
+    }
+
+    // 3. Leer la tabla de PCBs (8 KB)
+    size_t pcb_table_bytes = sizeof(*process_control_block_table.entries) * process_control_block_table.num_entries;
+    printf("pcb_table_bytes: %zu\n", pcb_table_bytes);
+    size_t read_bytes = fread(process_control_block_table.entries, 1, pcb_table_bytes, mem_file);
+    if (read_bytes != pcb_table_bytes) {
+        fprintf(stderr, "Error al leer la tabla de PCBs.\n");
+        goto error;
+    }
+
+    // 4. Leer tabla invertida de páginas (192 KB)
+    size_t inverted_page_table_bytes = sizeof(*inverted_page_table.entries) * inverted_page_table.num_entries;
+    printf("inverted_page_table_bytes: %zu\n", inverted_page_table_bytes);
+    read_bytes = fread(inverted_page_table.entries, 1, inverted_page_table_bytes, mem_file);
+    if (read_bytes != inverted_page_table_bytes) {
+        fprintf(stderr, "Error al leer la tabla invertida de páginas.\n");
+        goto error;
+    }
+
+    // 5. Leer el bitmap (8 KB)
+    size_t frame_bitmap_bytes = sizeof(uint8_t) * frame_bitmap.num_bytes;
+    printf("frame_bitmap_bytes: %zu\n", frame_bitmap_bytes);
+    read_bytes = fread(frame_bitmap.bytes, 1, frame_bitmap_bytes, mem_file);
+    if (read_bytes != frame_bitmap_bytes) {
+        fprintf(stderr, "Error al leer el bitmap.\n");
+        goto error;
+    }
+
+    // 6. Leer el área de datos (2 GB)
+    size_t data_area_bytes = sizeof(*data.frames) * data.num_frames;
+    printf("data_area_bytes: %zu\n", data_area_bytes);
+    read_bytes = fread(data.frames, 1, data_area_bytes, mem_file);
+    if (read_bytes != data_area_bytes) {
+        fprintf(stderr, "Error al leer el área de datos.\n");
+        goto error;
+    }
+
+    // 7. Cerrar archivo
+    fclose(mem_file);
+    return;
+
+    error:
+        fclose(mem_file);
+        exit(EXIT_FAILURE);
 }
 
 

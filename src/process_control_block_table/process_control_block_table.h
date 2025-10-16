@@ -1,0 +1,11 @@
+#pragma once
+#include "stdbool.h"
+#include "stdlib.h"
+#include "../process_control_block/process_control_block.h"
+
+typedef struct {
+    ProcessControlBlock* entries;
+    size_t num_entries;
+} ProcessControlBlockTable;
+
+void initialize_ProcessControlBlockTable(ProcessControlBlockTable* table, size_t num_entries);

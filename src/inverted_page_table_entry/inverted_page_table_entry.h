@@ -8,11 +8,11 @@ typedef struct {
     // Donde los N son parte de VPN, los P son parte del pid y la V es el bit de validez
 } InvertedPageTableEntry;
 
-bool get_validity(InvertedPageTableEntry inverted_page_table_entry);
+bool get_validity(InvertedPageTableEntry* inverted_page_table_entry);
 
-uint16_t get_virtualPageNumber(InvertedPageTableEntry inverted_page_table_entry);
+uint16_t get_virtualPageNumber(InvertedPageTableEntry* inverted_page_table_entry);
 
-uint16_t get_processesIdentifier(InvertedPageTableEntry inverted_page_table_entry);
+uint16_t get_processesIdentifier(InvertedPageTableEntry* inverted_page_table_entry);
 
 void set_validity(InvertedPageTableEntry* entry, bool validity);
 

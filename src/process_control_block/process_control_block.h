@@ -3,10 +3,9 @@
 #include "stdlib.h"
 #include "../osm_File/osm_File.h"
 
-typedef struct ProcessControlBlock {
+typedef struct {
     bool state;
     char name[13]; // No incluye el ’\0’ al final
     uint8_t id;
     osmFile file_table[10];
-    
 } ProcessControlBlock;
