@@ -26,15 +26,22 @@ int main(int argc, char const *argv[]) {
   mount_memory((char *)argv[1]);
 
   // commandos test
-  list_processes();
-
-  printf("Slots libres para procesos: %d\n", processes_slots());
-
-  list_files(198);
-  osmFile* file = open_file(198, "meow.mp3", 'w');
-  close_file(file);
   list_files(198);
 
+  // 1. cargar un archivo
+  // osmFile* file = open_file(198, "Enunciado.pdf", 'w');
+  // write_file(file, "Enunciado_T2_IIC2333_2025_2.pdf");
+
+  // 2. descargar archivo
+  // osmFile* file = open_file(198, "Enunciado.pdf", 'r');
+  // read_file(file, "Copia_Enunciado.pdf");
+
+  // 3. borrar archivo
+  // delete_file(198, "Enunciado.pdf");
+  // list_files(198);
+
+  osmFile* file = open_file(198, "Enunciado.pdf", 'r');
+  read_file(file, "Copia_Enunciado.pdf");
 
 
   // Liberar memoria

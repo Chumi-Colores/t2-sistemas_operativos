@@ -396,11 +396,140 @@ int read_file(osmFile* file_desc, char* dest) {
     return (int)total_written; // devuelve bytes leídos/escritos al archivo destino
 }
 
+int allocate_free_frame(int pid, int vpn) {
+    size_t total_frames = frame_bitmap.num_bytes * 8;
 
-int write_file(osmFile* file_desc, char* src)
-{
-    return -1;
+    for (size_t pfn = 0; pfn < total_frames; pfn++) {
+        size_t byte_index = pfn / 8;
+        uint8_t bit_index = pfn % 8;
+
+        if (!(frame_bitmap.bytes[byte_index] & (1 << bit_index))) {
+
+            frame_bitmap.bytes[byte_index] |= (1 << bit_index);
+            write_frame_from_bitmap_in_bin(pfn); // Persistir
+
+
+            InvertedPageTableEntry* entry = &inverted_page_table.entries[pfn];
+            set_validity(entry, true);
+            set_processesIdentifier(entry, pid);
+            set_virtualPageNumber(entry, vpn);
+            write_entry_from_inverted_page_table_in_bin(entry, pfn);
+
+            return (int)pfn; // Devuelve el frame asignado
+        }
+    }
+
+    return -1; // No hay frames libres
 }
+
+
+
+int write_file(osmFile* file_desc, char* src) {
+    if (!file_desc || !file_desc->validity) {
+        return -1;
+    }
+
+    // Abrir archivo fuente en el sistema local
+    FILE* input_file = fopen(src, "rb");
+    if (!input_file) {
+        printf("Error abriendo archivo %s", src);
+        return -1;
+    }
+
+    // Determinar PID al que pertenece file_desc
+    int pid = -1;
+    for (int i = 0; i < (int)process_control_block_table.num_entries; i++) {
+        ProcessControlBlock* pcb = &process_control_block_table.entries[i];
+        if (!pcb->state) continue;
+
+        for (int j = 0; j < FILES_PER_PROCESS; j++) {
+            if (&pcb->file_table[j] == file_desc) {
+                pid = pcb->id;
+                break;
+            }
+        }
+        if (pid != -1) break;
+    }
+
+    if (pid == -1) {
+        fprintf(stderr, "Error: no se encontró PID para el osmFile*\n");
+        fclose(input_file);
+        return -1;
+    }
+
+    // Descomponer dirección virtual inicial del archivo
+    uint32_t vaddr = (uint32_t)file_desc->virtual_adress;
+    uint32_t vpn = get_virtual_page_number_from_virtual_adress(vaddr);
+    uint32_t offset = vaddr & 0x7FFF; // 15 bits
+
+    uint64_t total_written = 0;
+    uint8_t buffer[sizeof(frame)];
+    long data_offset = process_control_block_table.num_entries * sizeof(ProcessControlBlock) + inverted_page_table.num_entries * sizeof(InvertedPageTableEntry) + frame_bitmap.num_bytes * sizeof(uint8_t);
+    FILE* mem_file = fopen(bin_memory_path, "r+b");
+
+    while (true) {
+        // Leer del archivo fuente
+        size_t read_bytes = fread(buffer, 1, sizeof(buffer), input_file);
+        if (read_bytes == 0) break; // fin de archivo
+
+        size_t buffer_offset = 0;
+
+        while (buffer_offset < read_bytes) {
+            // Obtener/crear frame para la VPN actual
+            int pfn = get_InvertedPageTableEntryIndex(&inverted_page_table, pid, vpn);
+            if (pfn == -1) {
+                // No existe entrada → buscar frame libre y asignarlo
+                pfn = allocate_free_frame(pid, vpn);
+                if (pfn == -1) {
+                    fprintf(stderr, "No quedan frames disponibles\n");
+                    fclose(input_file);
+                    fclose(mem_file);
+                    return (int)total_written;
+                }
+            }
+
+            // Cuántos bytes caben en este frame desde el offset actual
+            size_t space_in_frame = sizeof(frame) - offset;
+            size_t to_write = read_bytes - buffer_offset;
+            if (to_write > space_in_frame) to_write = space_in_frame;
+
+            // Copiar datos al frame
+            memcpy(&data.frames[pfn].bytes[offset], &buffer[buffer_offset], to_write);
+            long frame_start = (long)pfn * sizeof(frame);
+            fseek(mem_file, data_offset + frame_start + offset, SEEK_SET);
+            fwrite(&buffer[buffer_offset], 1, to_write, mem_file);
+            total_written += to_write;
+            buffer_offset += to_write;
+            offset += to_write;
+
+            // Si llené el frame, paso al siguiente VPN
+            if (offset == sizeof(frame)) {
+                vpn++;
+                offset = 0;
+            }
+        }
+
+        if (read_bytes < sizeof(buffer)) break; // fin de archivo
+    }
+
+    fclose(input_file);
+    fclose(mem_file);
+
+    // Actualizar file_desc->file_size
+    file_desc->file_size = uint40_from_uint64(total_written);
+
+    // Guardar en memoria persistente (binario)
+    int pcb_index = get_ProcessControlBlockIndex(&process_control_block_table, pid);
+    for (int i = 0; i < FILES_PER_PROCESS; i++) {
+        if (&process_control_block_table.entries[pcb_index].file_table[i] == file_desc) {
+            save_file_entry_to_bin(pcb_index, i);
+            break;
+        }
+    }
+
+    return (int)total_written;
+}
+
 
 void delete_file(int process_id, char* file_name)
 {
@@ -409,7 +538,7 @@ void delete_file(int process_id, char* file_name)
 
     for (int i = 0; i < FILES_PER_PROCESS; i++) {
         if (pcb->file_table[i].validity && strncmp(pcb->file_table[i].name, file_name, 14) == 0) {
-            pcb->file_table[i].validity = 0;
+            pcb->file_table[i].file_size = uint40_from_uint64(0);
             int32_t virtual_adress = pcb->file_table[i].virtual_adress;
             int vpn = get_virtual_page_number_from_virtual_adress(virtual_adress);
 
