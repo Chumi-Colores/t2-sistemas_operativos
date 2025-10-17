@@ -12,3 +12,6 @@ void initialize_ProcessControlBlockTable(ProcessControlBlockTable* table, size_t
 
 
 ProcessControlBlock* get_ProcessControlBlock(ProcessControlBlockTable* table, int process_id);
+
+
+int get_ProcessControlBlockIndex(ProcessControlBlockTable* table, int process_id);

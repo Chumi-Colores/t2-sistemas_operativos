@@ -31,8 +31,9 @@ int main(int argc, char const *argv[]) {
   printf("Slots libres para procesos: %d\n", processes_slots());
 
   list_files(198);
-  osmFile* file = open_file(198, "asgore.mp3", 'r');
-  read_file(file, "asgore.mp3");
+  osmFile* file = open_file(198, "meow.mp3", 'w');
+  list_files(198);
+  read_file(file, "meow.mp3");
 
 
 

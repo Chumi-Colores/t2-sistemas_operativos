@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
 #include <stdint.h>
 #include "os_memory_API.h"
 #include "../process_control_block_table/process_control_block_table.h"
@@ -31,7 +32,6 @@ void mount_memory(char* memory_path) {
 
     // 3. Leer la tabla de PCBs (8 KB)
     size_t pcb_table_bytes = sizeof(*process_control_block_table.entries) * process_control_block_table.num_entries;
-    printf("pcb_table_bytes: %zu\n", pcb_table_bytes);
     size_t read_bytes = fread(process_control_block_table.entries, 1, pcb_table_bytes, mem_file);
     if (read_bytes != pcb_table_bytes) {
         fprintf(stderr, "Error al leer la tabla de PCBs.\n");
@@ -40,7 +40,6 @@ void mount_memory(char* memory_path) {
 
     // 4. Leer tabla invertida de páginas (192 KB)
     size_t inverted_page_table_bytes = sizeof(*inverted_page_table.entries) * inverted_page_table.num_entries;
-    printf("inverted_page_table_bytes: %zu\n", inverted_page_table_bytes);
     read_bytes = fread(inverted_page_table.entries, 1, inverted_page_table_bytes, mem_file);
     if (read_bytes != inverted_page_table_bytes) {
         fprintf(stderr, "Error al leer la tabla invertida de páginas.\n");
@@ -49,7 +48,6 @@ void mount_memory(char* memory_path) {
 
     // 5. Leer el bitmap (8 KB)
     size_t frame_bitmap_bytes = sizeof(uint8_t) * frame_bitmap.num_bytes;
-    printf("frame_bitmap_bytes: %zu\n", frame_bitmap_bytes);
     read_bytes = fread(frame_bitmap.bytes, 1, frame_bitmap_bytes, mem_file);
     if (read_bytes != frame_bitmap_bytes) {
         fprintf(stderr, "Error al leer el bitmap.\n");
@@ -58,7 +56,6 @@ void mount_memory(char* memory_path) {
 
     // 6. Leer el área de datos (2 GB)
     size_t data_area_bytes = sizeof(*data.frames) * data.num_frames;
-    printf("data_area_bytes: %zu\n", data_area_bytes);
     read_bytes = fread(data.frames, 1, data_area_bytes, mem_file);
     if (read_bytes != data_area_bytes) {
         fprintf(stderr, "Error al leer el área de datos.\n");
@@ -217,6 +214,22 @@ int file_table_slots(int process_id) {
 
 /* ====== FUNCIONES PARA ARCHIVOS ====== */
 
+void save_file_entry_to_bin(int pcb_index, int file_index) {
+    FILE* mem_file = fopen(bin_memory_path, "r+b");
+    if (!mem_file) {
+        perror("No se pudo abrir el archivo de memoria para escritura");
+        exit(EXIT_FAILURE);
+    }
+    
+    size_t pcb_offset = sizeof(ProcessControlBlock) * pcb_index;
+    size_t file_offset = file_index * sizeof(osmFile);
+
+    fseek(mem_file, pcb_offset + offsetof(ProcessControlBlock, file_table) + file_offset, SEEK_SET);
+    fwrite(&process_control_block_table.entries[pcb_index].file_table[file_index], sizeof(osmFile), 1, mem_file);
+
+    fclose(mem_file);
+}
+
 osmFile* open_file(int process_id, char* file_name, char mode) {
     ProcessControlBlock* pcb = get_ProcessControlBlock(&process_control_block_table, process_id);
     if (!pcb) return NULL;
@@ -252,12 +265,14 @@ osmFile* open_file(int process_id, char* file_name, char mode) {
                     break;
                 }
             }
+            save_file_entry_to_bin(get_ProcessControlBlockIndex(&process_control_block_table, process_id), i);
             return &pcb->file_table[i];
         }
     }
 
     return NULL;
 }
+
 
 
 int read_file(osmFile* file_desc, char* dest) {
@@ -305,7 +320,6 @@ int read_file(osmFile* file_desc, char* dest) {
     // Descomponer dirección virtual inicial
     uint32_t vaddr = (uint32_t)file_desc->virtual_adress;
     uint32_t vpn = get_virtual_page_number_from_virtual_adress(vaddr);   // 12 bits VPN
-    printf("Starting VPN: %#x\n", vpn);
     uint32_t offset = vaddr & 0x7FFF;      // 15 bits offset
 
     uint64_t bytes_remaining = file_size;

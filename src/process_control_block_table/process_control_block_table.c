@@ -16,3 +16,13 @@ ProcessControlBlock* get_ProcessControlBlock(ProcessControlBlockTable* table, in
     }
     return NULL;
 }
+
+
+int get_ProcessControlBlockIndex(ProcessControlBlockTable* table, int process_id) {
+    for (size_t i = 0; i < table->num_entries; i++) {
+        if (table->entries[i].state && table->entries[i].id == (uint8_t)process_id) {
+            return i;
+        }
+    }
+    return -1;
+}
