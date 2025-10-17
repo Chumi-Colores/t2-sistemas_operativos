@@ -86,6 +86,36 @@ int start_process(int process_id, char* process_name) {
     return 0;
 }
 
+int free_everything_from_process(int process_id) {
+    ProcessControlBlockEntry* pcb_entry = &process_control_block_table.entries[process_id];
+
+    for (size_t i = 0; i < 10; i++) {
+        pcb_entry->file_table[i].validity = 0;
+        int32_t virtual_adress = pcb_entry->file_table[i].virtual_adress;
+        // el vpn son los siguientes 12 bits
+        int vpn = (virtual_adress >> 15) & 0b00000000000000000000111111111111;
+
+        free_entry_from_inverted_page_table(process_id, vpn);
+    }
+    return 0;
+}
+
+void free_entry_from_inverted_page_table(int process_id, int virtual_page_number) {
+    int entry_index = get_InvertedPageTableEntryIndex(&inverted_page_table, process_id, virtual_page_number);
+    if (entry_index == -1) {
+        return;
+    }
+    InvertedPageTableEntry* entry = &inverted_page_table.entries[entry_index];
+    set_validity(entry, 0);
+
+    // Liberar el frame en el bitmap
+    free_frame_in_bitmap(entry_index);
+}
+
+void free_frame_in_bitmap(int frame_number) {
+    frame_bitmap.bytes[frame_number / 8] &= ~(1 << (frame_number % 8));
+}
+
 int finish_process(int process_id) {
     ProcessControlBlockEntry* pcb_entry = &process_control_block_table.entries[process_id];
     
@@ -93,11 +123,7 @@ int finish_process(int process_id) {
         return -1;
     }
 
-    pcb_entry->state = 0;
-    pcb_entry->id = 0;
-    memset(pcb_entry->name, 0, sizeof(pcb_entry->name));
-    memset(pcb_entry->file_table, 0, sizeof(pcb_entry->file_table));
-    return 0;
+    return free_everything_from_process(process_id);
 }
 
 int clear_all_processes() {
@@ -106,11 +132,8 @@ int clear_all_processes() {
         ProcessControlBlockEntry* pcb_entry = &process_control_block_table.entries[i];
         if (pcb_entry->state) {
             terminated_processes_count++;
+            free_everything_from_process(i);
         }
-        pcb_entry->state = 0;
-        pcb_entry->id = 0;
-        memset(pcb_entry->name, 0, sizeof(pcb_entry->name));
-        memset(pcb_entry->file_table, 0, sizeof(pcb_entry->file_table));
     }
     return terminated_processes_count;
 }
