@@ -353,9 +353,9 @@ int read_file(osmFile* file_desc, char* dest) {
     }
 
     // Descomponer dirección virtual inicial
-    uint32_t vaddr = (uint32_t)file_desc->virtual_adress;
-    uint32_t vpn = get_virtual_page_number_from_virtual_adress(vaddr);   // 12 bits VPN
-    uint32_t offset = vaddr & 0x7FFF;      // 15 bits offset
+    uint32_t virtual_address = (uint32_t)file_desc->virtual_adress;
+    uint32_t vpn = get_virtual_page_number_from_virtual_adress(virtual_address); // 12 bits VPN
+    uint32_t offset = virtual_address & 0x7FFF; // 15 bits offset
 
     uint64_t bytes_remaining = file_size;
     uint64_t total_written = 0;
@@ -363,8 +363,8 @@ int read_file(osmFile* file_desc, char* dest) {
     while (bytes_remaining > 0) {
         // Obtener PFN (índice de frame) para esa entrada
         int pfn = get_InvertedPageTableEntryIndex(&inverted_page_table, pid, vpn);
-        if (pfn == -1) {
-            fprintf(stderr, "Error: PFN %d fuera de rango\n", pfn);
+        if (pfn == -1 || !get_validity(&inverted_page_table.entries[pfn])) {
+            fprintf(stderr, "Error: PFN no válido al leer archivo\n");
             fclose(out);
             return -1;
         }
@@ -387,13 +387,13 @@ int read_file(osmFile* file_desc, char* dest) {
         total_written += written;
         bytes_remaining -= written;
 
-        // Avanzar a la siguiente página/frame
+        // Avanzar al siguiente frame
         vpn++;
         offset = 0; // solo el primer frame puede tener offset != 0
     }
 
     fclose(out);
-    return (int)total_written; // devuelve bytes leídos/escritos al archivo destino
+    return (int)total_written;
 }
 
 int allocate_free_frame(int pid, int vpn) {
@@ -406,7 +406,7 @@ int allocate_free_frame(int pid, int vpn) {
         if (!(frame_bitmap.bytes[byte_index] & (1 << bit_index))) {
 
             frame_bitmap.bytes[byte_index] |= (1 << bit_index);
-            write_frame_from_bitmap_in_bin(pfn); // Persistir
+            write_frame_from_bitmap_in_bin(pfn);
 
 
             InvertedPageTableEntry* entry = &inverted_page_table.entries[pfn];
@@ -423,13 +423,11 @@ int allocate_free_frame(int pid, int vpn) {
 }
 
 
-
 int write_file(osmFile* file_desc, char* src) {
     if (!file_desc || !file_desc->validity) {
         return -1;
     }
 
-    // Abrir archivo fuente en el sistema local
     FILE* input_file = fopen(src, "rb");
     if (!input_file) {
         printf("Error abriendo archivo %s", src);
@@ -458,9 +456,9 @@ int write_file(osmFile* file_desc, char* src) {
     }
 
     // Descomponer dirección virtual inicial del archivo
-    uint32_t vaddr = (uint32_t)file_desc->virtual_adress;
-    uint32_t vpn = get_virtual_page_number_from_virtual_adress(vaddr);
-    uint32_t offset = vaddr & 0x7FFF; // 15 bits
+    uint32_t virtual_address = (uint32_t)file_desc->virtual_adress;
+    uint32_t vpn = get_virtual_page_number_from_virtual_adress(virtual_address);
+    uint32_t offset = virtual_address & 0b0111111111111111; // 15 bits
 
     uint64_t total_written = 0;
     uint8_t buffer[sizeof(frame)];
@@ -531,20 +529,56 @@ int write_file(osmFile* file_desc, char* src) {
 }
 
 
-void delete_file(int process_id, char* file_name)
-{
+void delete_file(int process_id, char* file_name) {
     ProcessControlBlock* pcb = get_ProcessControlBlock(&process_control_block_table, process_id);
     if (!pcb) return;
 
     for (int i = 0; i < FILES_PER_PROCESS; i++) {
-        if (pcb->file_table[i].validity && strncmp(pcb->file_table[i].name, file_name, 14) == 0) {
-            pcb->file_table[i].file_size = uint40_from_uint64(0);
-            int32_t virtual_adress = pcb->file_table[i].virtual_adress;
-            int vpn = get_virtual_page_number_from_virtual_adress(virtual_adress);
+        osmFile* file_desc = &pcb->file_table[i];
+        if (!file_desc->validity) continue;
+        if (strncmp(file_desc->name, file_name, 14) != 0) continue;
 
-            free_entry_from_inverted_page_table(process_id, vpn);
-            return;
+        uint64_t file_size = uint64_from_uint40(file_desc->file_size);
+        if (file_size == 0) break; // nada que borrar
+
+        int vaddr_start = file_desc->virtual_adress;
+        int pages = (file_size + 32767) / 32768; // número de páginas usadas
+        long data_offset = 8192L + 196608L + 8192L; // PCB + IPT + Bitmap
+
+        FILE* mem_file = fopen(bin_memory_path, "r+b");
+
+        for (int j = 0; j < pages; j++) {
+            int vpn = get_virtual_page_number_from_virtual_adress(vaddr_start + j * 32768);
+            int pfn = get_InvertedPageTableEntryIndex(&inverted_page_table, process_id, vpn);
+            if (pfn == -1) continue;
+
+            // Calcular offsets precisos en el frame
+            size_t start_offset = (j == 0) ? (vaddr_start & 0x7FFF) : 0;
+            size_t end_offset = (j == pages - 1) ? ((file_size - 1) % 32768) + 1 : 32768;
+            size_t bytes_to_clear = end_offset - start_offset;
+
+            // Limpiar memoria física
+            memset(&data.frames[pfn].bytes[start_offset], 0, bytes_to_clear);
+
+            // Escribir solo los bytes limpiados al binario
+            fseek(mem_file, data_offset + pfn * sizeof(frame) + start_offset, SEEK_SET);
+            fwrite(&data.frames[pfn].bytes[start_offset], 1, bytes_to_clear, mem_file);
+
+            // Invalida la entrada en la tabla invertida
+            set_validity(&inverted_page_table.entries[pfn], 0);
+            write_entry_from_inverted_page_table_in_bin(&inverted_page_table.entries[pfn], pfn);
+
+            // Liberar el frame en el bitmap
+            free_frame_in_bitmap(pfn);
         }
+
+        fclose(mem_file);
+
+        // Actualizar PCB
+        file_desc->file_size = uint40_from_uint64(0);
+        save_file_entry_to_bin(get_ProcessControlBlockIndex(&process_control_block_table, process_id), i);
+
+        return;
     }
 }
 
