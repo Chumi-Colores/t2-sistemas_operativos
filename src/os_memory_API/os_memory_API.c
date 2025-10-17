@@ -132,27 +132,29 @@ void frame_bitmap_status() {
 
 
 /* ====== FUNCIONES PARA PROCESOS ====== */
-void write_process_in_bin(ProcessControlBlock* pcb_entry) {
-    int n = pcb_entry->id;
+void write_process_in_bin(int process_index) {
+    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_index];
     FILE* mem_file = fopen(bin_memory_path, "r+b");
     long start = 0L;
-    long offset = start + (sizeof(*pcb_entry) * n);  // posición donde escribir
+    long offset = start + (sizeof(*pcb_entry) * process_index);  // posición donde escribir
     fseek(mem_file, offset, SEEK_SET);
     fwrite(pcb_entry, sizeof(*pcb_entry), 1, mem_file);
     fclose(mem_file);
 }
 
 int start_process(int process_id, char* process_name) {
-    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_id];
-    
-    if (pcb_entry->state) {
+    // get the first empty entry
+    int empty_index = get_free_ProcessControlBlock_index(&process_control_block_table);
+    if (empty_index == -1) {
         return -1;
     }
+
+    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[empty_index];
 
     pcb_entry->state = 1;
     pcb_entry->id = process_id;
     strncpy(pcb_entry->name, process_name, 14);
-    write_process_in_bin(pcb_entry);
+    write_process_in_bin(empty_index);
     return 0;
 }
 
@@ -195,7 +197,8 @@ void free_entry_from_inverted_page_table(int process_id, int virtual_page_number
 }
 
 int free_everything_from_process(int process_id) {
-    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_id];
+    int process_index = get_ProcessControlBlockIndex(&process_control_block_table, process_id);
+    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_index];
 
     for (size_t i = 0; i < 10; i++) {
         pcb_entry->file_table[i].validity = 0;
@@ -205,13 +208,14 @@ int free_everything_from_process(int process_id) {
     }
     pcb_entry->state = 0;
 
-    write_process_in_bin(pcb_entry);
+    write_process_in_bin(process_index);
     return 0;
 }
 
 int finish_process(int process_id) {
-    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_id];
-    
+    int process_index = get_ProcessControlBlockIndex(&process_control_block_table, process_id);
+    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_index];
+
     if (!pcb_entry->state) {
         return -1;
     }
@@ -353,9 +357,9 @@ int read_file(osmFile* file_desc, char* dest) {
     }
 
     // Descomponer dirección virtual inicial
-    uint32_t virtual_address = (uint32_t)file_desc->virtual_adress;
-    uint32_t vpn = get_virtual_page_number_from_virtual_adress(virtual_address); // 12 bits VPN
-    uint32_t offset = virtual_address & 0x7FFF; // 15 bits offset
+    uint32_t vaddr = (uint32_t)file_desc->virtual_adress;
+    uint32_t vpn = get_virtual_page_number_from_virtual_adress(vaddr);   // 12 bits VPN
+    uint32_t offset = vaddr & 0x7FFF;      // 15 bits offset
 
     uint64_t bytes_remaining = file_size;
     uint64_t total_written = 0;
@@ -363,8 +367,8 @@ int read_file(osmFile* file_desc, char* dest) {
     while (bytes_remaining > 0) {
         // Obtener PFN (índice de frame) para esa entrada
         int pfn = get_InvertedPageTableEntryIndex(&inverted_page_table, pid, vpn);
-        if (pfn == -1 || !get_validity(&inverted_page_table.entries[pfn])) {
-            fprintf(stderr, "Error: PFN no válido al leer archivo\n");
+        if (pfn == -1) {
+            fprintf(stderr, "Error: PFN %d fuera de rango\n", pfn);
             fclose(out);
             return -1;
         }
@@ -387,13 +391,13 @@ int read_file(osmFile* file_desc, char* dest) {
         total_written += written;
         bytes_remaining -= written;
 
-        // Avanzar al siguiente frame
+        // Avanzar a la siguiente página/frame
         vpn++;
         offset = 0; // solo el primer frame puede tener offset != 0
     }
 
     fclose(out);
-    return (int)total_written;
+    return (int)total_written; // devuelve bytes leídos/escritos al archivo destino
 }
 
 int allocate_free_frame(int pid, int vpn) {
@@ -406,7 +410,7 @@ int allocate_free_frame(int pid, int vpn) {
         if (!(frame_bitmap.bytes[byte_index] & (1 << bit_index))) {
 
             frame_bitmap.bytes[byte_index] |= (1 << bit_index);
-            write_frame_from_bitmap_in_bin(pfn);
+            write_frame_from_bitmap_in_bin(pfn); // Persistir
 
 
             InvertedPageTableEntry* entry = &inverted_page_table.entries[pfn];
@@ -423,11 +427,13 @@ int allocate_free_frame(int pid, int vpn) {
 }
 
 
+
 int write_file(osmFile* file_desc, char* src) {
     if (!file_desc || !file_desc->validity) {
         return -1;
     }
 
+    // Abrir archivo fuente en el sistema local
     FILE* input_file = fopen(src, "rb");
     if (!input_file) {
         printf("Error abriendo archivo %s", src);
@@ -456,9 +462,9 @@ int write_file(osmFile* file_desc, char* src) {
     }
 
     // Descomponer dirección virtual inicial del archivo
-    uint32_t virtual_address = (uint32_t)file_desc->virtual_adress;
-    uint32_t vpn = get_virtual_page_number_from_virtual_adress(virtual_address);
-    uint32_t offset = virtual_address & 0b0111111111111111; // 15 bits
+    uint32_t vaddr = (uint32_t)file_desc->virtual_adress;
+    uint32_t vpn = get_virtual_page_number_from_virtual_adress(vaddr);
+    uint32_t offset = vaddr & 0x7FFF; // 15 bits
 
     uint64_t total_written = 0;
     uint8_t buffer[sizeof(frame)];
@@ -529,56 +535,20 @@ int write_file(osmFile* file_desc, char* src) {
 }
 
 
-void delete_file(int process_id, char* file_name) {
+void delete_file(int process_id, char* file_name)
+{
     ProcessControlBlock* pcb = get_ProcessControlBlock(&process_control_block_table, process_id);
     if (!pcb) return;
 
     for (int i = 0; i < FILES_PER_PROCESS; i++) {
-        osmFile* file_desc = &pcb->file_table[i];
-        if (!file_desc->validity) continue;
-        if (strncmp(file_desc->name, file_name, 14) != 0) continue;
+        if (pcb->file_table[i].validity && strncmp(pcb->file_table[i].name, file_name, 14) == 0) {
+            pcb->file_table[i].file_size = uint40_from_uint64(0);
+            int32_t virtual_adress = pcb->file_table[i].virtual_adress;
+            int vpn = get_virtual_page_number_from_virtual_adress(virtual_adress);
 
-        uint64_t file_size = uint64_from_uint40(file_desc->file_size);
-        if (file_size == 0) break; // nada que borrar
-
-        int vaddr_start = file_desc->virtual_adress;
-        int pages = (file_size + 32767) / 32768; // número de páginas usadas
-        long data_offset = 8192L + 196608L + 8192L; // PCB + IPT + Bitmap
-
-        FILE* mem_file = fopen(bin_memory_path, "r+b");
-
-        for (int j = 0; j < pages; j++) {
-            int vpn = get_virtual_page_number_from_virtual_adress(vaddr_start + j * 32768);
-            int pfn = get_InvertedPageTableEntryIndex(&inverted_page_table, process_id, vpn);
-            if (pfn == -1) continue;
-
-            // Calcular offsets precisos en el frame
-            size_t start_offset = (j == 0) ? (vaddr_start & 0x7FFF) : 0;
-            size_t end_offset = (j == pages - 1) ? ((file_size - 1) % 32768) + 1 : 32768;
-            size_t bytes_to_clear = end_offset - start_offset;
-
-            // Limpiar memoria física
-            memset(&data.frames[pfn].bytes[start_offset], 0, bytes_to_clear);
-
-            // Escribir solo los bytes limpiados al binario
-            fseek(mem_file, data_offset + pfn * sizeof(frame) + start_offset, SEEK_SET);
-            fwrite(&data.frames[pfn].bytes[start_offset], 1, bytes_to_clear, mem_file);
-
-            // Invalida la entrada en la tabla invertida
-            set_validity(&inverted_page_table.entries[pfn], 0);
-            write_entry_from_inverted_page_table_in_bin(&inverted_page_table.entries[pfn], pfn);
-
-            // Liberar el frame en el bitmap
-            free_frame_in_bitmap(pfn);
+            free_entry_from_inverted_page_table(process_id, vpn);
+            return;
         }
-
-        fclose(mem_file);
-
-        // Actualizar PCB
-        file_desc->file_size = uint40_from_uint64(0);
-        save_file_entry_to_bin(get_ProcessControlBlockIndex(&process_control_block_table, process_id), i);
-
-        return;
     }
 }
 

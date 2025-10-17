@@ -3,6 +3,15 @@
 #include "../process_control_block/process_control_block.h"
 #include "process_control_block_table.h"
 
+int get_free_ProcessControlBlock_index(ProcessControlBlockTable* table) {
+    for (size_t i = 0; i < table->num_entries; i++) {
+        if (!table->entries[i].state) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
 void initialize_ProcessControlBlockTable(ProcessControlBlockTable* table, size_t num_entries) {
     table->entries = malloc(sizeof(ProcessControlBlock) * num_entries);
     table->num_entries = num_entries;

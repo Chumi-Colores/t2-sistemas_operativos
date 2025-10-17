@@ -42,13 +42,17 @@ int main(int argc, char const *argv[]) {
   while (play) {
     // get console input
     printf("-----------------------------------------------------------\n");
-    printf("Ingrese un comando: \n");
+    if (!there_is_an_open_file) {
+      printf("Ingrese un comando [0-13]: \n");
+    } else {
+      printf("Ingrese un comando [0-10]: \n");
+    }
     printf("0- Salir\n");
     printf("1- list_processes\n");
     printf("2- processes_slots\n");
     printf("3- list_files <process_id>\n");
     printf("4- frame_bitmap\n");
-    printf("5- start_process <process_name>\n");
+    printf("5- start_process <process_id> <process_name>\n");
     printf("6- finish_process <process_id>\n");
     printf("7- clear_all_processes\n");
     printf("8- file_table_slots <process_id>\n");
@@ -93,7 +97,7 @@ int main(int argc, char const *argv[]) {
         scanf("%s", process_name);
         pid_from_started_file = start_process(process_id, process_name);
         if (pid_from_started_file != -1) {
-          printf("Proceso iniciado con PID: %d\n", pid_from_started_file);
+          printf("Proceso iniciado con PID\n");
         } else {
           printf("No se pudo iniciar el proceso.\n");
         }
