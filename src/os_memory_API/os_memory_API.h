@@ -16,13 +16,13 @@ void frame_bitmap_status();
 
 /* ====== FUNCIONES PARA PROCESOS ====== */
 
-// int start_process(int process_id, char* process_name);
+int start_process(int process_id, char* process_name);
 
-// int finish_process(int process_id);
+int finish_process(int process_id);
 
-// int clear_all_processes();
+int clear_all_processes();
 
-// int file_table_slots(int process_id);
+int file_table_slots(int process_id);
 
 
 /* ====== FUNCIONES PARA ARCHIVOS ====== */
