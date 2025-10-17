@@ -111,7 +111,7 @@ void list_files(int process_id) {
             memcpy(name, osm_file->name, 14);
             name[14] = '\0'; // name no incluye'\0 final'
             uint64_t file_size = uint64_from_uint40(osm_file->file_size);
-            int vpn = (osm_file->virtual_adress >> 5) & 0xFFF;
+            int vpn = (osm_file->virtual_adress >> 15) & 0b00000000000000000000111111111111;
 
             printf("%#x %llu %#x %s\n", vpn, (unsigned long long)file_size, osm_file->virtual_adress, name);
         }
@@ -149,14 +149,20 @@ int start_process(int process_id, char* process_name) {
     return 0;
 }
 
-int finish_process(int process_id) {
-    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_id];
-    
-    if (!pcb_entry->state) {
-        return -1;
-    }
+void free_frame_in_bitmap(int frame_number) {
+    frame_bitmap.bytes[frame_number / 8] &= ~(1 << (frame_number % 8));
+}
 
-    return free_everything_from_process(process_id);
+void free_entry_from_inverted_page_table(int process_id, int virtual_page_number) {
+    int entry_index = get_InvertedPageTableEntryIndex(&inverted_page_table, process_id, virtual_page_number);
+    if (entry_index == -1) {
+        return;
+    }
+    InvertedPageTableEntry* entry = &inverted_page_table.entries[entry_index];
+    set_validity(entry, 0);
+
+    // Liberar el frame en el bitmap
+    free_frame_in_bitmap(entry_index);
 }
 
 int free_everything_from_process(int process_id) {
@@ -173,20 +179,14 @@ int free_everything_from_process(int process_id) {
     return 0;
 }
 
-void free_entry_from_inverted_page_table(int process_id, int virtual_page_number) {
-    int entry_index = get_InvertedPageTableEntryIndex(&inverted_page_table, process_id, virtual_page_number);
-    if (entry_index == -1) {
-        return;
+int finish_process(int process_id) {
+    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_id];
+    
+    if (!pcb_entry->state) {
+        return -1;
     }
-    InvertedPageTableEntry* entry = &inverted_page_table.entries[entry_index];
-    set_validity(entry, 0);
 
-    // Liberar el frame en el bitmap
-    free_frame_in_bitmap(entry_index);
-}
-
-void free_frame_in_bitmap(int frame_number) {
-    frame_bitmap.bytes[frame_number / 8] &= ~(1 << (frame_number % 8));
+    return free_everything_from_process(process_id);
 }
 
 int clear_all_processes() {

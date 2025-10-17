@@ -32,11 +32,11 @@ int main(int argc, char const *argv[]) {
 
   list_files(198);
 
-  delete_file(198, "dummy.mp3");
+  // delete_file(198, "dummy.mp3");
 
-  list_files(198);
+  // list_files(198);
 
-  frame_bitmap_status();
+  // frame_bitmap_status();
 
   // Liberar memoria
   free(process_control_block_table.entries);
