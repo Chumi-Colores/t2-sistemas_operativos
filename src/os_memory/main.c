@@ -32,8 +32,8 @@ int main(int argc, char const *argv[]) {
 
   list_files(198);
   osmFile* file = open_file(198, "meow.mp3", 'w');
+  close_file(file);
   list_files(198);
-  read_file(file, "meow.mp3");
 
 
 

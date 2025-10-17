@@ -421,6 +421,22 @@ void delete_file(int process_id, char* file_name)
 
 void close_file(osmFile* file_desc)
 {
-    if (!file_desc) return
+    if (!file_desc) return;
+
     file_desc->validity = false;
+
+
+    for (size_t i = 0; i < process_control_block_table.num_entries; i++)
+    {
+        ProcessControlBlock* pcb = &process_control_block_table.entries[i];
+        if (!pcb->state) continue;
+        for (size_t j = 0; j < FILES_PER_PROCESS; j++)
+        {
+            if (&pcb->file_table[j] == file_desc)
+            {
+                save_file_entry_to_bin(i, j);
+                return;
+            }
+        }
+    }
 }
