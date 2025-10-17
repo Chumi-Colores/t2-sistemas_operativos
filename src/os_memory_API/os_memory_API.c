@@ -110,7 +110,23 @@ void list_files(int process_id) {
             uint64_t file_size = uint64_from_uint40(osm_file->file_size);
             int vpn = get_virtual_page_number_from_virtual_adress(osm_file->virtual_adress);
 
-            printf("%#x %llu %#x %s\n", vpn, (unsigned long long)file_size, osm_file->virtual_adress, name);
+            if (vpn == 0){
+                printf("0x000 ");
+            }
+            else{
+                printf("%#x ", vpn);
+            }
+
+            printf("%llu ", (unsigned long long)file_size);
+
+            if (osm_file->virtual_adress == 0){
+                printf("0x00000 ");
+            }
+            else{
+                printf("%#x ", osm_file->virtual_adress);
+            }
+
+            printf("%s\n", name);
         }
     }
 }
