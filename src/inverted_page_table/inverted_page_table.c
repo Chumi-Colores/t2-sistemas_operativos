@@ -18,3 +18,13 @@ InvertedPageTableEntry* get_InvertedPageTableEntry(InvertedPageTable* table, int
     }
     return NULL; // No se encontró la entrada
 }
+
+int get_InvertedPageTableEntryIndex(InvertedPageTable* table, int process_id, int virtual_page_number) {
+    for (size_t i = 0; i < table->num_entries; i++) {
+        InvertedPageTableEntry* entry = &table->entries[i];
+        if (process_id == get_processesIdentifier(entry) && virtual_page_number == get_virtualPageNumber(entry)) {
+            return i;
+        }
+    }
+    return -1; // No se encontró la entrada
+}

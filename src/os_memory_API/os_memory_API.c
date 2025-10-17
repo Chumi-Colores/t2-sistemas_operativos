@@ -16,6 +16,8 @@ extern InvertedPageTable inverted_page_table;
 extern FrameBitmap frame_bitmap;
 extern Data data;
 
+
+// funciones generales
 void mount_memory(char* memory_path) {
     // 1. Guardar la ruta en la variable global
     strcpy(bin_memory_path, memory_path);
@@ -72,8 +74,6 @@ void mount_memory(char* memory_path) {
         exit(EXIT_FAILURE);
 }
 
-
-// // funciones procesos
 
 void list_processes() {
     for (size_t i = 0; i < process_control_block_table.num_entries; i++) {
@@ -133,5 +133,86 @@ void frame_bitmap_status() {
     printf("USADOS: %zu LIBRES: %zu\n", used, free);
 }
 
+
+// funciones procesos
+int start_process(int process_id, char* process_name) {
+    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_id];
+    
+    if (pcb_entry->state) {
+        return -1;
+    }
+
+    pcb_entry->state = 1;
+    pcb_entry->id = process_id;
+    strncpy(pcb_entry->name, process_name, 14);
+    return 0;
+}
+
+int finish_process(int process_id) {
+    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_id];
+    
+    if (!pcb_entry->state) {
+        return -1;
+    }
+
+    return free_everything_from_process(process_id);
+}
+
+int free_everything_from_process(int process_id) {
+    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_id];
+
+    for (size_t i = 0; i < 10; i++) {
+        pcb_entry->file_table[i].validity = 0;
+        int32_t virtual_adress = pcb_entry->file_table[i].virtual_adress;
+        // el vpn son los siguientes 12 bits
+        int vpn = (virtual_adress >> 15) & 0b00000000000000000000111111111111;
+
+        free_entry_from_inverted_page_table(process_id, vpn);
+    }
+    return 0;
+}
+
+void free_entry_from_inverted_page_table(int process_id, int virtual_page_number) {
+    int entry_index = get_InvertedPageTableEntryIndex(&inverted_page_table, process_id, virtual_page_number);
+    if (entry_index == -1) {
+        return;
+    }
+    InvertedPageTableEntry* entry = &inverted_page_table.entries[entry_index];
+    set_validity(entry, 0);
+
+    // Liberar el frame en el bitmap
+    free_frame_in_bitmap(entry_index);
+}
+
+void free_frame_in_bitmap(int frame_number) {
+    frame_bitmap.bytes[frame_number / 8] &= ~(1 << (frame_number % 8));
+}
+
+int clear_all_processes() {
+    int terminated_processes_count = 0;
+    for (size_t i = 0; i < process_control_block_table.num_entries; i++) {
+        ProcessControlBlock* pcb_entry = &process_control_block_table.entries[i];
+        if (pcb_entry->state) {
+            terminated_processes_count++;
+            free_everything_from_process(i);
+        }
+    }
+    return terminated_processes_count;
+}
+
+int file_table_slots(int process_id) {
+    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_id];
+    if (!pcb_entry->state) {
+        return -1;
+    }
+
+    int free_slots = 0;
+    for (size_t i = 0; i < 10; i++) {
+        if (pcb_entry->file_table[i].validity == 0) {
+            free_slots++;
+        }
+    }
+    return free_slots;
+}
 
 // // funciones archivos

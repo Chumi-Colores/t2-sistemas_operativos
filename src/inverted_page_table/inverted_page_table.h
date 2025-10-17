@@ -12,3 +12,5 @@ typedef struct {
 void initialize_InvertedPageTable(InvertedPageTable* table, size_t num_entries);
 
 InvertedPageTableEntry* get_InvertedPageTableEntry(InvertedPageTable* table, int process_id, int virtual_page_number);
+
+int get_InvertedPageTableEntryIndex(InvertedPageTable* table, int process_id, int virtual_page_number);
