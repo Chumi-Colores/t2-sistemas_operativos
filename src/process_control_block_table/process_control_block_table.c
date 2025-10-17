@@ -8,6 +8,15 @@ void initialize_ProcessControlBlockTable(ProcessControlBlockTable* table, size_t
     table->num_entries = num_entries;
 }
 
+int get_free_ProcessControlBlock_index(ProcessControlBlockTable* table) {
+    for (size_t i = 0; i < table->num_entries; i++) {
+        if (!table->entries[i].state) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
 ProcessControlBlock* get_ProcessControlBlock(ProcessControlBlockTable* table, int process_id) {
     for (size_t i = 0; i < table->num_entries; i++) {
         if (table->entries[i].state && table->entries[i].id == (uint8_t)process_id) {

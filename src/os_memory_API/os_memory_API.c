@@ -132,27 +132,30 @@ void frame_bitmap_status() {
 
 
 /* ====== FUNCIONES PARA PROCESOS ====== */
-void write_process_in_bin(ProcessControlBlock* pcb_entry) {
-    int n = pcb_entry->id;
+void write_process_in_bin(int process_index) {
+    printf("Escribiendo proceso %d en binario\n", process_index);
+    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_index];
     FILE* mem_file = fopen(bin_memory_path, "r+b");
     long start = 0L;
-    long offset = start + (sizeof(*pcb_entry) * n);  // posición donde escribir
+    long offset = start + (sizeof(*pcb_entry) * process_index);  // posición donde escribir
     fseek(mem_file, offset, SEEK_SET);
     fwrite(pcb_entry, sizeof(*pcb_entry), 1, mem_file);
     fclose(mem_file);
 }
 
 int start_process(int process_id, char* process_name) {
-    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_id];
-    
-    if (pcb_entry->state) {
+    // get the first empty entry
+    int empty_index = get_free_ProcessControlBlock_index(&process_control_block_table);
+    if (empty_index == -1) {
         return -1;
     }
+
+    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[empty_index];
 
     pcb_entry->state = 1;
     pcb_entry->id = process_id;
     strncpy(pcb_entry->name, process_name, 14);
-    write_process_in_bin(pcb_entry);
+    write_process_in_bin(empty_index);
     return 0;
 }
 
@@ -195,7 +198,8 @@ void free_entry_from_inverted_page_table(int process_id, int virtual_page_number
 }
 
 int free_everything_from_process(int process_id) {
-    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_id];
+    int process_index = get_ProcessControlBlockIndex(&process_control_block_table, process_id);
+    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_index];
 
     for (size_t i = 0; i < 10; i++) {
         pcb_entry->file_table[i].validity = 0;
@@ -205,13 +209,14 @@ int free_everything_from_process(int process_id) {
     }
     pcb_entry->state = 0;
 
-    write_process_in_bin(pcb_entry);
+    write_process_in_bin(process_index);
     return 0;
 }
 
 int finish_process(int process_id) {
-    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_id];
-    
+    int process_index = get_ProcessControlBlockIndex(&process_control_block_table, process_id);
+    ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_index];
+
     if (!pcb_entry->state) {
         return -1;
     }

@@ -8,6 +8,8 @@ typedef struct {
     size_t num_entries;
 } ProcessControlBlockTable;
 
+int get_free_ProcessControlBlock_index(ProcessControlBlockTable* table);
+
 void initialize_ProcessControlBlockTable(ProcessControlBlockTable* table, size_t num_entries);
 
 
