@@ -75,4 +75,63 @@ void mount_memory(char* memory_path) {
 
 // // funciones procesos
 
+void list_processes() {
+    for (size_t i = 0; i < process_control_block_table.num_entries; i++) {
+        ProcessControlBlock* pcb = &process_control_block_table.entries[i];
+        if (pcb->state) {
+            char name[15];
+            memcpy(name, pcb->name, 14);
+            name[14] = '\0'; // name no incluye'\0 final'
+            printf("%u %s\n", pcb->id, name);
+        }
+    }
+}
+
+int processes_slots() {
+    int free_slots = 0;
+    for (size_t i = 0; i < process_control_block_table.num_entries; i++) {
+        if (!process_control_block_table.entries[i].state) {
+            free_slots++;
+        }
+    }
+    return free_slots;
+}
+
+void list_files(int process_id) {
+    ProcessControlBlock* pcb = get_ProcessControlBlock(&process_control_block_table, process_id);
+
+    if (pcb == NULL) {
+        return;
+    }
+
+    for (int i = 0; i < 10; i++) {
+        osmFile* osm_file = &pcb->file_table[i];
+        if (osm_file->validity) {
+            char name[15];
+            memcpy(name, osm_file->name, 14);
+            name[14] = '\0'; // name no incluye'\0 final'
+            uint64_t file_size = uint64_from_uint40(osm_file->file_size);
+            int vpn = (osm_file->virtual_adress >> 5) & 0xFFF;
+
+            printf("%#x %llu %#x %s\n", vpn, (unsigned long long)file_size, osm_file->virtual_adress, name);
+        }
+    }
+}
+
+void frame_bitmap_status() {
+    size_t total_frames = frame_bitmap.num_bytes * 8;
+    size_t used = 0;
+    for (size_t b = 0; b < frame_bitmap.num_bytes; b++) {
+        uint8_t byte = frame_bitmap.bytes[b];
+        for (int bit = 0; bit < 8; bit++) {
+            used += (((byte >> bit) & 0b00000001) == 1);
+        }
+    }
+
+    size_t free = total_frames - used;
+
+    printf("USADOS: %zu LIBRES: %zu\n", used, free);
+}
+
+
 // // funciones archivos

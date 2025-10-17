@@ -9,3 +9,6 @@ typedef struct {
 } ProcessControlBlockTable;
 
 void initialize_ProcessControlBlockTable(ProcessControlBlockTable* table, size_t num_entries);
+
+
+ProcessControlBlock* get_ProcessControlBlock(ProcessControlBlockTable* table, int process_id);

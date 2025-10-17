@@ -21,15 +21,21 @@ int main(int argc, char const *argv[]) {
   initialize_FrameBitmap(&frame_bitmap, 65536>>3);
   initialize_Data(&data, 1 << 16);
   
-  // montar la memoria
 
   mount_memory((char *)argv[1]);
 
-  
+  // commandos test
+  list_processes();
+
+  printf("Slots libres para procesos: %d\n", processes_slots());
+
+  list_files(198);
+
+  frame_bitmap_status();
+
+  // Liberar memoria
   free(process_control_block_table.entries);
   free(inverted_page_table.entries);
   free(frame_bitmap.bytes);
   free(data.frames);
-
-  return 0;
 }
