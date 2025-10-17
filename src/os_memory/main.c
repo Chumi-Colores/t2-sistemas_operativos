@@ -22,18 +22,18 @@ int main(int argc, char const *argv[]) {
   initialize_FrameBitmap(&frame_bitmap, 65536>>3);
   initialize_Data(&data, 1 << 16);
   
-
   mount_memory((char *)argv[1]);
 
   // commandos test
   list_processes();
-
   printf("Slots libres para procesos: %d\n", processes_slots());
 
-  list_files(198);
-  osmFile* file = open_file(198, "asgore.mp3", 'r');
-  read_file(file, "asgore.mp3");
+  finish_process(3);
+  list_processes();
+  printf("Slots libres para procesos: %d\n", processes_slots());
 
+
+  list_files(198);
 
 
   // Liberar memoria

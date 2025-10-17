@@ -136,6 +136,16 @@ void frame_bitmap_status() {
 
 /* ====== FUNCIONES PARA PROCESOS ====== */
 
+void write_process_in_bin(ProcessControlBlock* pcb_entry) {
+    int n = pcb_entry->id;
+    FILE* mem_file = fopen(bin_memory_path, "r+b");
+    long start = 0L;
+    long offset = start + (sizeof(*pcb_entry) * n);  // posición donde escribir
+    fseek(mem_file, offset, SEEK_SET);
+    fwrite(pcb_entry, sizeof(*pcb_entry), 1, mem_file);
+    fclose(mem_file);
+}
+
 int start_process(int process_id, char* process_name) {
     ProcessControlBlock* pcb_entry = &process_control_block_table.entries[process_id];
     
@@ -146,11 +156,32 @@ int start_process(int process_id, char* process_name) {
     pcb_entry->state = 1;
     pcb_entry->id = process_id;
     strncpy(pcb_entry->name, process_name, 14);
+    write_process_in_bin(pcb_entry);
     return 0;
+}
+
+void write_frame_from_bitmap_in_bin(int frame_number) {
+    FILE* mem_file = fopen(bin_memory_path, "r+b");
+    long start = 8192L + 196608L; // inicio del bitmap
+    long offset = start + (sizeof(uint8_t) * frame_number / 8);
+    fseek(mem_file, offset, SEEK_SET);
+    uint8_t byte = frame_bitmap.bytes[frame_number / 8];
+    fwrite(&byte, sizeof(uint8_t), 1, mem_file);
+    fclose(mem_file);
 }
 
 void free_frame_in_bitmap(int frame_number) {
     frame_bitmap.bytes[frame_number / 8] &= ~(1 << (frame_number % 8));
+    write_frame_from_bitmap_in_bin(frame_number);
+}
+
+void write_entry_from_inverted_page_table_in_bin(InvertedPageTableEntry* entry, int entry_index) {
+    FILE* mem_file = fopen(bin_memory_path, "r+b");
+    long start = 8192L;
+    long offset = start + (sizeof(*entry) * entry_index);  // posición donde escribir
+    fseek(mem_file, offset, SEEK_SET);
+    fwrite(entry, sizeof(*entry), 1, mem_file);
+    fclose(mem_file);
 }
 
 void free_entry_from_inverted_page_table(int process_id, int virtual_page_number) {
@@ -160,6 +191,8 @@ void free_entry_from_inverted_page_table(int process_id, int virtual_page_number
     }
     InvertedPageTableEntry* entry = &inverted_page_table.entries[entry_index];
     set_validity(entry, 0);
+
+    write_entry_from_inverted_page_table_in_bin(entry, entry_index);
 
     // Liberar el frame en el bitmap
     free_frame_in_bitmap(entry_index);
@@ -183,6 +216,9 @@ int finish_process(int process_id) {
     if (!pcb_entry->state) {
         return -1;
     }
+
+    pcb_entry->state = 0;
+    write_process_in_bin(pcb_entry);
 
     return free_everything_from_process(process_id);
 }
