@@ -27,15 +27,16 @@ int file_table_slots(int process_id);
 
 /* ====== FUNCIONES PARA ARCHIVOS ====== */
 
-// osmFile* open_file(int process_id, char* file_name, char mode);
 
-// int read_file(osmFile* file desc, char* dest);
+osmFile* open_file(int process_id, char* file_name, char mode);
 
-// int write_file(osmFile* file desc, char* src);
+int read_file(osmFile* file_desc, char* dest);
 
-// void delete_file(int process id, char* file name);
+int write_file(osmFile* file_desc, char* src);
 
-// void close_file(osmFile* file_desc);
+void delete_file(int process_id, char* file_name);
+
+void close_file(osmFile* file_desc);
 
 
 /*====== BONUS =====*/

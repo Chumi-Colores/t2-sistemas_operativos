@@ -20,8 +20,8 @@ uint16_t get_virtualPageNumber(InvertedPageTableEntry* entry)
 {
     // VPN = bits 11–23 (13 bits)
     // Si uno ignora el entry->data[0] son los bits bits 8–15 (13 bits)
-    uint16_t vpn = (entry->data[2] << 8) | (entry->data[1]) >> 3;
-    return vpn; // quitamos el bit más alto no significativo
+    uint16_t vpn = ((entry->data[2] & 0xFE) << 5) | ((entry->data[1] >> 3) & 0x1F);
+    return vpn;
 }
 
 void set_validity(InvertedPageTableEntry* entry, bool validity)

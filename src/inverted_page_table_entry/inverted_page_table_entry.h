@@ -4,8 +4,15 @@
 #include "stdint.h"
 
 typedef struct {
-    unsigned char data[3]; // NNNNNNNN NNNNNPPP PPPPPPPV
-    // Donde los N son parte de VPN, los P son parte del pid y la V es el bit de validez
+    unsigned char data[3];
+    // Estructura de bits (de LSB a MSB):
+    // data[0]: PPPPPPPV   (7 bits de PID + 1 bit validez)
+    // data[1]: NNNNNPPP   (5 bits de VPN + 3 bits de PID)
+    // data[2]: NNNNNNNN   (8 bits de VPN)
+    //
+    // V  -> bit de validez (bit 0 de data[0])
+    // PID -> bits 1–10
+    // VPN -> bits 11–23
 } InvertedPageTableEntry;
 
 bool get_validity(InvertedPageTableEntry* inverted_page_table_entry);

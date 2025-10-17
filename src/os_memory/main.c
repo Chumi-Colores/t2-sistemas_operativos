@@ -10,6 +10,7 @@ ProcessControlBlockTable process_control_block_table;
 InvertedPageTable inverted_page_table;
 FrameBitmap frame_bitmap;
 Data data;
+const int FILES_PER_PROCESS = 10;
 
 int main(int argc, char const *argv[]) {
   if (argc != 2) {
@@ -28,6 +29,10 @@ int main(int argc, char const *argv[]) {
   list_processes();
 
   printf("Slots libres para procesos: %d\n", processes_slots());
+
+  list_files(198);
+
+  delete_file(198, "dummy.mp3");
 
   list_files(198);
 
