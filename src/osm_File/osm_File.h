@@ -9,3 +9,5 @@ typedef struct osmFile {
     uint40_t file_size;
     int32_t virtual_adress;
 } osmFile;
+
+int get_virtual_page_number_from_virtual_adress(int32_t virtual_adress);

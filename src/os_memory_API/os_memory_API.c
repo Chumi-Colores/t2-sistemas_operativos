@@ -111,7 +111,7 @@ void list_files(int process_id) {
             memcpy(name, osm_file->name, 14);
             name[14] = '\0'; // name no incluye'\0 final'
             uint64_t file_size = uint64_from_uint40(osm_file->file_size);
-            int vpn = (osm_file->virtual_adress >> 15) & 0b00000000000000000000111111111111;
+            int vpn = get_virtual_page_number_from_virtual_adress(osm_file->virtual_adress);
 
             printf("%#x %llu %#x %s\n", vpn, (unsigned long long)file_size, osm_file->virtual_adress, name);
         }
@@ -171,9 +171,7 @@ int free_everything_from_process(int process_id) {
     for (size_t i = 0; i < 10; i++) {
         pcb_entry->file_table[i].validity = 0;
         int32_t virtual_adress = pcb_entry->file_table[i].virtual_adress;
-        // el vpn son los siguientes 12 bits
-        int vpn = (virtual_adress >> 15) & 0b00000000000000000000111111111111;
-
+        int vpn = get_virtual_page_number_from_virtual_adress(virtual_adress);
         free_entry_from_inverted_page_table(process_id, vpn);
     }
     return 0;
@@ -306,7 +304,8 @@ int read_file(osmFile* file_desc, char* dest) {
 
     // Descomponer dirección virtual inicial
     uint32_t vaddr = (uint32_t)file_desc->virtual_adress;
-    uint32_t vpn = (vaddr >> 15) & 0xFFF;   // 12 bits VPN
+    uint32_t vpn = get_virtual_page_number_from_virtual_adress(vaddr);   // 12 bits VPN
+    printf("Starting VPN: %#x\n", vpn);
     uint32_t offset = vaddr & 0x7FFF;      // 15 bits offset
 
     uint64_t bytes_remaining = file_size;
@@ -363,8 +362,7 @@ void delete_file(int process_id, char* file_name)
         if (pcb->file_table[i].validity && strncmp(pcb->file_table[i].name, file_name, 14) == 0) {
             pcb->file_table[i].validity = 0;
             int32_t virtual_adress = pcb->file_table[i].virtual_adress;
-            // el vpn son los siguientes 12 bits
-            int vpn = (virtual_adress >> 15) & 0b00000000000000000000111111111111;
+            int vpn = get_virtual_page_number_from_virtual_adress(virtual_adress);
 
             free_entry_from_inverted_page_table(process_id, vpn);
             return;

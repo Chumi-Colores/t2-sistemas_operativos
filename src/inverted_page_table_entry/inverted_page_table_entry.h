@@ -6,9 +6,9 @@
 typedef struct {
     unsigned char data[3];
     // Estructura de bits (de LSB a MSB):
-    // data[0]: PPPPPPPV   (7 bits de PID + 1 bit validez)
-    // data[1]: NNNNNPPP   (5 bits de VPN + 3 bits de PID)
-    // data[2]: NNNNNNNN   (8 bits de VPN)
+    // data[2]: VPPPPPPV   (1 bit validez + 7 bits de PID)
+    // data[1]: PPPNNNNN   (3 bits de PID + 5 bits de VPN)
+    // data[0]: NNNNNNNN   (8 bits de VPN)
     //
     // V  -> bit de validez (bit 0 de data[0])
     // PID -> bits 1–10
