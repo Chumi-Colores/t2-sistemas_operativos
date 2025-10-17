@@ -421,5 +421,6 @@ void delete_file(int process_id, char* file_name)
 
 void close_file(osmFile* file_desc)
 {
-    return;
+    if (!file_desc) return
+    file_desc->validity = false;
 }
